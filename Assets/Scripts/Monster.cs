@@ -22,14 +22,6 @@ public class Monster : MonoBehaviour
     void Update()
     {
         CharacterHealthUp();
-
-        if (Input.GetKeyDown(KeyCode.Space))
-        //스페이스바를 눌렀을때
-        {
-            CharacterHit(AttackPoint);
-            //CharacterHit 함수를 호출하여 Damage값에 AttackPoint를 대입하여 계산
-        }
-
         CheckDeath();
     }
 
