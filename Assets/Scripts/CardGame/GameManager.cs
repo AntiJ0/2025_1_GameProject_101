@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Unity.VisualScripting;
 
 public class GameManager : MonoBehaviour
 {
@@ -32,11 +33,19 @@ public class GameManager : MonoBehaviour
         4, 4
     };
 
+    public Transform mergeArea;
+    public Button mergeButton;
+    public int maxMergeSize = 3;
+
+    public GameObject[] mergeCards;
+    public int mergeCount;
+
     // Start is called before the first frame update
     void Start()
     {
         deckCards = new GameObject[predefinedDeck.Length];
         handCards = new GameObject[maxHandSize];
+        mergeCards = new GameObject[maxMergeSize];
 
         //덱 초기화 및 셔플
         InitializeDeck();
@@ -45,6 +54,12 @@ public class GameManager : MonoBehaviour
         if (drawButton != null)
         {
             drawButton.onClick.AddListener(OnDrawButtonClicked);
+        }
+
+        if (mergeButton != null)
+        {
+            mergeButton.onClick.AddListener(OnMergeButtonClicked);
+            mergeButton.interactable = false;
         }
     }
 
@@ -111,6 +126,23 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public void ArrangeMerge()
+    {
+        if (mergeCount == 0)
+            return;
+
+        float startX = -(mergeCount - 1) * cardSpacing / 2;
+
+        for (int i = 0; i < mergeCount; i++)
+        {
+            if (mergeCards[i] != null)
+            {
+                Vector3 newPos = mergeArea.position + new Vector3(startX + i * cardSpacing, 0, -0.005f);
+                mergeCards[i].transform.position = newPos;
+            }
+        }
+    }
+
     void OnDrawButtonClicked()
     {
         DrawCardToHand();
@@ -119,7 +151,7 @@ public class GameManager : MonoBehaviour
     //덱에서 카드를 뽑아 손으로 이동
     public void DrawCardToHand()
     {
-        if (handCount >= maxHandSize)
+        if (handCount + mergeCount >= maxHandSize)
         {
             Debug.Log("손패가 가득 찼습니다!");
             return;
@@ -147,5 +179,109 @@ public class GameManager : MonoBehaviour
         drawnCard.transform.SetParent(handArea);
 
         ArrangeHand();
+    }
+
+    public void MoveCardToMerge(GameObject card)
+    {
+        if (mergeCount >= maxMergeSize)
+        {
+            Debug.Log("머지 영역이 가득 찼습니다!");
+            return;
+        }
+        for (int i = 0; i < handCount; i++)
+        {
+            if (handCards[i] == card)
+            {
+                for (int j = i; j < handCount - 1; j++)
+                {
+                    handCards[j] = handCards[j + 1];
+                }
+                handCards[handCount - 1] = null;
+                handCount--;
+
+                ArrangeHand();
+                break;
+            }
+        }
+
+        mergeCards[mergeCount] = card;
+        mergeCount++;
+
+        card.transform.SetParent(mergeArea);
+        ArrangeMerge();
+        UpdateMergeButtonState();
+    }
+    
+
+    void UpdateMergeButtonState()
+    {
+        if (mergeButton != null)
+        {
+            mergeButton.interactable = (mergeCount == 2 || mergeCount == 3);
+        }
+    }
+
+    void MergeCards()
+    {
+        if (mergeCount != 2 && mergeCount != 3)
+        {
+            Debug.Log("머지를 하려면 카드가 2개 또는 3개 필요합니다!");
+            return;
+        }
+
+        int firstCardValue = mergeCards[0].GetComponent<Card>().cardValue;
+        for (int i = 1; i < mergeCount; i++)
+        {
+            Card card = mergeCards[i].GetComponent<Card>();
+            if (card == null || card.cardValue != firstCardValue)
+            {
+                Debug.Log("같은 숫자의 카드만 머지 할 수 있습니다.");
+                return;
+            }
+        }
+
+        int newValue = firstCardValue + 1;
+
+        if (newValue > cardImages.Length)
+        {
+            Debug.Log("최대 카드 값에 도달 했습니다.");
+            return;
+        }
+
+        for (int i = 0; i < mergeCount; i++)
+        {
+            if (mergeCards[i] == null)
+            {
+                mergeCards[i].SetActive(false);
+            }
+        }
+
+        GameObject newCard = Instantiate(cardPrefab, mergeArea.position, Quaternion.identity);
+
+        Card newCardTemp = newCard.GetComponent<Card>();
+        if (newCardTemp != null)
+        {
+            int imageIndex = newValue - 1;
+            newCardTemp.InitCard(newValue, cardImages[imageIndex]);
+        }
+
+        for (int i = 0; i < maxMergeSize; i++)
+        {
+            mergeCards[i] = null;
+        }
+        mergeCount = 0;
+
+        UpdateMergeButtonState();
+
+        handCards[handCount] = newCard;
+        handCount++;
+        newCard.transform.SetParent(handArea);
+
+        ArrangeHand();
+    }
+
+    void OnMergeButtonClicked()
+    {
+        MergeCards();
     }
 }
