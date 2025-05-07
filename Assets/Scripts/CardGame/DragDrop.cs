@@ -45,7 +45,72 @@ public class DragDrop : MonoBehaviour
         isDragging = false;
         GetComponent<SpriteRenderer>().sortingOrder = 1;
 
-        ReturnToOriginalPosition();
+        if (gameManager == null)
+        {
+            ReturnToOriginalPosition();
+            return;
+        }
+
+        bool wasInMergeArea = startParent == gameManager.mergeArea;
+
+        if (IsOverArea(gameManager.handArea))
+        {
+            Debug.Log("손패 영역으로 이동");
+
+            if (wasInMergeArea)
+            {
+                for (int i = 0; i < gameManager.mergeCount; i++)
+                {
+                    if (gameManager.mergeCards[i] == gameObject)
+                    {
+                        // 카드 제거 후 배열 앞으로 당기기
+                        for (int j = i; j < gameManager.mergeCount - 1; j++)
+                        {
+                            gameManager.mergeCards[j] = gameManager.mergeCards[j + 1];
+                        }
+                        gameManager.mergeCards[gameManager.mergeCount - 1] = null;
+                        gameManager.mergeCount--;
+
+                        transform.SetParent(gameManager.handArea);
+                        gameManager.handCards[gameManager.handCount] = gameObject;
+                        gameManager.handCount++;
+
+                        gameManager.ArrangeHand();
+                        gameManager.ArrangeMerge();
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                gameManager.ArrangeHand();
+            }
+        }
+        else if (IsOverArea(gameManager.mergeArea))
+        {
+            if (gameManager.mergeCount >= gameManager.maxMergeSize)
+            {
+                Debug.Log("머지 영역이 가득 찼습니다!");
+                ReturnToOriginalPosition();
+            }
+            else
+            {
+                gameManager.MoveCardToMerge(gameObject);
+            }
+        }
+        else
+        {
+            ReturnToOriginalPosition();
+        }
+
+        if (wasInMergeArea)
+        {
+            if (gameManager.mergeButton != null)
+            {
+                bool canMerge = (gameManager.mergeCount == 2 || gameManager.mergeCount == 3);
+                gameManager.mergeButton.interactable = canMerge;
+            }
+        }
     }
 
     void ReturnToOriginalPosition()
@@ -59,6 +124,10 @@ public class DragDrop : MonoBehaviour
             {
                 gameManager.ArrangeHand();
             }
+            if (startParent == gameManager.mergeArea)
+            {
+                gameManager.ArrangeMerge();
+            }
         }
     }
 
@@ -69,10 +138,20 @@ public class DragDrop : MonoBehaviour
             return false;
         }    
 
-        Collider2D areaCollider = area.GetComponent<Collider2D>();
-        if (areaCollider != null)
-            return false;
+        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mousePosition.z = 0;
 
-        return areaCollider.bounds.Contains(transform.position);
+        RaycastHit2D[] hits = Physics2D.RaycastAll(mousePosition, Vector2.zero);
+
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hit.collider != null && hit.collider.transform == area)
+            {
+                Debug.Log(area.name + "영역 감지됨");
+                return true;
+            }
+        }
+
+        return false;
     }
 }
